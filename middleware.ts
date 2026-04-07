@@ -1,27 +1,32 @@
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req, res })
 
-  if (pathname.startsWith('/api') || pathname.startsWith('/_next') || pathname === '/favicon.ico') {
-    return NextResponse.next()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const { pathname } = req.nextUrl
+
+  const isAuthPage =
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/register') ||
+    pathname.startsWith('/auth')
+
+  if (!session && !isAuthPage) {
+    return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  const token = request.cookies.get('sb-jjepqeltkmudjawsmpm-auth-token')
-
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register') || pathname.startsWith('/auth')
-
-  if (!token && !isAuthPage) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (session && isAuthPage) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
-  if (token && isAuthPage) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
-  return NextResponse.next()
+  return res
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
 }
